@@ -10,13 +10,14 @@ import (
 func main() {
 	cfg := options.Init()
 	orm.Init(cfg)
-	// rows, _ := orm.Engine.Query("select * from userinfo where username=?", username)
-	// for _, row := range rows {
-	// 	Uid := string(row["uid"])
-	// 	Username := string(row["username"])
-	// 	Password := string(row["password"])
-	// 	beego.Info(Uid, Username, Password)
-	// }
+
+	// oss.Init(cfg)
+	// client.Init()
 
 	beego.Run()
+
+	// count := Add(func(b int) int {
+	// 	return b % 2
+	// })
+	// fmt.Println(count)
 }

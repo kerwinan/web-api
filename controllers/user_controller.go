@@ -35,6 +35,11 @@ func (u *UserController) Post() {
 		retResponse = u.GetAllUserInfo()
 	case "UserLogin":
 		retResponse = u.UserLogin(js)
+	case "UpdateUserInfo":
+		retResponse = u.UpdateUserInfo(js)
+	case "DeleteUser":
+		retResponse = u.DeleteUser(js)
+
 	default:
 		retResponse["Code"] = "cmd error"
 	}
@@ -50,34 +55,54 @@ func (u *UserController) GetAllUserInfo() (retBody map[string]interface{}) {
 func (u *UserController) Get() {
 	u.Ctx.WriteString("")
 	u.ServeJSON()
-
 }
 
-func (u *UserController) UserLogin(js *simplejson.Json) (retBody map[string]interface{}) {
-	retBody = make(map[string]interface{})
-	err := models.UserLogin(js)
+func (u *UserController) UserLogin(js *simplejson.Json) map[string]interface{} {
+	// retBody = make(map[string]interface{})
+	retBody, err := models.UserLogin(js)
 	if err == nil {
-		retBody["StatusCode"] = "200 ok"
-		return
+		beego.Error("login failed...", err.Error())
+		return nil
 	}
-	retBody["error"] = err.Error()
 	return retBody
 }
 
-func (u *UserController) GetUserInfo(js *simplejson.Json) (retBody map[string]interface{}) {
-	retBody = make(map[string]interface{})
+func (u *UserController) GetUserInfo(js *simplejson.Json) map[string]interface{} {
+	// retBody = make(map[string]interface{})
 	retBody, err := models.GetUserInfo(js)
 	if err != nil {
-		beego.Error("GetUserInfo cmd err: ", err.Error())
+		beego.Error("get user info error: ", err.Error())
+		return nil
 	}
 	return retBody
 }
 
-func (u *UserController) AddUserInfo(js *simplejson.Json) (retBody map[string]interface{}) {
-	retBody = make(map[string]interface{})
+func (u *UserController) AddUserInfo(js *simplejson.Json) map[string]interface{} {
+	// retBody = make(map[string]interface{})
 	retBody, err := models.AddUserInfo(js)
 	if err != nil {
-		beego.Error(err)
+		beego.Error("insert user info error: ", err.Error())
+		return nil
+	}
+	return retBody
+}
+
+func (u *UserController) UpdateUserInfo(js *simplejson.Json) map[string]interface{} {
+	// retBody = make(map[string]interface{})
+	retBody, err := models.UpdateUserInfo(js)
+	if err != nil {
+		// retBody["error"] = err.Error()
+		beego.Error("update user info error: ", err.Error())
+		return nil
+	}
+	return retBody
+}
+
+func (u *UserController) DeleteUser(js *simplejson.Json) map[string]interface{} {
+	retBody, err := models.DeleteUser(js)
+	if err != nil {
+		beego.Error("delete user info error: ", err.Error())
+		return retBody
 	}
 	return retBody
 }

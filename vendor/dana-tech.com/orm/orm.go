@@ -11,16 +11,6 @@ import (
 
 var Engine *xorm.Engine
 
-// type OrmOpt struct {
-// 	Type    string `json:"type" yaml:"type"`
-// 	User    string `json:"user" yaml:"user"`
-// 	Pass    string `json:"pass" yaml:"pass"`
-// 	Host    string `json:"host" yaml:"host"`
-// 	Port    int    `json:"port" yaml:"port"`
-// 	Name    string `json:"name" yaml:"name"`
-// 	Charset string `json:"charset" yaml:"charset"`
-// }
-
 func Init(conf *goconf.ConfigFile) {
 	user, _ := conf.GetString("mysql", "user")
 	pwd, _ := conf.GetString("mysql", "pwd")

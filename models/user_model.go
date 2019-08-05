@@ -3,6 +3,9 @@ package models
 import (
 	"database/sql"
 	"errors"
+	"fmt"
+
+	"dana-tech.com/web-api/lib"
 
 	"dana-tech.com/orm"
 
@@ -12,15 +15,17 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+// ...
 var (
 	UserList map[string]*User
 	db       *sql.DB
 )
 
+// User ...
 type User struct {
-	Uid      string
-	Username string
-	Password string
+	Uid      string `json:"id"`
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 func init() {
@@ -28,28 +33,14 @@ func init() {
 	// updateDB()
 }
 
-func openDB() *sql.DB {
-	db, err := sql.Open("mysql", "Sher:123456@/myself?charset=utf8")
-	if err != nil {
-		beego.Error("Open db err: ", err.Error())
-	}
-	return db
-}
-
-func closeDB() {
-	err := db.Close()
-	if err != nil {
-		beego.Error("Close db err: ", err.Error())
-	}
-}
-
+// AddUserInfo ...
 func AddUserInfo(js *simplejson.Json) (retBody map[string]interface{}, err error) {
 	body, ok := js.CheckGet("body")
 	if !ok {
 		beego.Error("CheckGet body err: ")
 	}
 	retBody = make(map[string]interface{})
-	username, err := body.Get("Username").String()
+	username, err := body.Get("username").String()
 	if username == "" || err != nil {
 		beego.Error("Username is empty...")
 		return nil, err
@@ -58,14 +49,13 @@ func AddUserInfo(js *simplejson.Json) (retBody map[string]interface{}, err error
 		return nil, errors.New("Username exist...")
 	}
 
-	retBody["Username"] = username
-
-	password, err := body.Get("Password").String()
+	password, err := body.Get("password").String()
 	if password == "" || err != nil {
 		beego.Error("Password is empty...")
 		return nil, err
 	}
-	_, err = orm.Engine.Query("insert into userinfo(username, password) values(?, ?)", username, password)
+	pwdMd5 := lib.NewMD5(password)
+	_, err = orm.Engine.Query("insert into userinfo(username, password) values(?, ?)", username, pwdMd5)
 	if err != nil {
 		beego.Error("insert db error: ", err.Error())
 		return nil, err
@@ -82,7 +72,7 @@ func GetUserInfo(js *simplejson.Json) (retBody map[string]interface{}, err error
 		beego.Error("CheckGet body err: ")
 	}
 	retBody = make(map[string]interface{})
-	username, _ := body.Get("Username").String()
+	username, _ := body.Get("username").String()
 	if username == "" {
 		return nil, errors.New("username is tmpty")
 	}
@@ -103,27 +93,28 @@ func GetUserInfo(js *simplejson.Json) (retBody map[string]interface{}, err error
 func GetAllUserInfo() (retBody map[string]interface{}) {
 
 	retBody = make(map[string]interface{})
-	rows, err := orm.Engine.Query("select * from userinfo")
+	rows, err := orm.Engine.Query("select * from userinfo order by uid")
 	if err == nil && rows != nil {
 		for _, row := range rows {
 			Uid := string(row["uid"])
 			Username := string(row["username"])
 			Password := string(row["password"])
+			fmt.Println("id=", Uid)
 			retBody[Uid] = &User{Uid, Username, Password}
 		}
 	}
 	return retBody
 }
 
-func UserLogin(js *simplejson.Json) error {
+func UserLogin(js *simplejson.Json) (retBody map[string]interface{}, err error) {
 	body, ok := js.CheckGet("body")
 	if !ok {
 		beego.Error("CheckGet body err: ")
 	}
-	username, _ := body.Get("Username").String()
-	password, _ := body.Get("Password").String()
+	username, _ := body.Get("username").String()
+	password, _ := body.Get("password").String()
 	if username == "" || password == "" {
-		return errors.New("name or pwd is empty")
+		return nil, errors.New("name or pwd is empty")
 	}
 
 	rows, err := orm.Engine.Query("select username, password from userinfo where username=?", username)
@@ -132,23 +123,77 @@ func UserLogin(js *simplejson.Json) error {
 		for _, row := range rows {
 			if username == string(row["username"]) &&
 				password == string(row["password"]) {
-				return nil
+				retBody["Status"] = "Login success"
+				retBody["Code"] = "200 OK"
+				return retBody, nil
 			}
 		}
 	}
-	return errors.New("name or pwd error")
+	return nil, errors.New("name or pwd error")
 }
 
-func DeleteUser(uid string) {
-	delete(UserList, uid)
+// DeleteUser ...
+func DeleteUser(js *simplejson.Json) (retBody map[string]interface{}, err error) {
+	body, ok := js.CheckGet("body")
+	if !ok {
+		beego.Error("CheckGet body err: ")
+	}
+	retBody = make(map[string]interface{})
+	username, _ := body.Get("username").String()
+	password, _ := body.Get("password").String()
+	if username == "" || password == "" {
+		return nil, errors.New("name or password is empty...")
+	}
+	if ok := identifyInfo(username, lib.NewMD5(password)); !ok {
+		retBody["error"] = "name or password error..."
+		return retBody, errors.New("name or password error...")
+	}
+	_, err = orm.Engine.Query("delete from userinfo where username=?", username)
+	if err != nil {
+		beego.Error("delete sql err: ", err.Error())
+	}
+	retBody["Status"] = "delete success..."
+	return retBody, nil
+}
+
+// UpdateUserInfo ...
+func UpdateUserInfo(js *simplejson.Json) (retBody map[string]interface{}, err error) {
+	body, ok := js.CheckGet("body")
+	if !ok {
+		beego.Error("CheckGet body err: ")
+	}
+	retBody = make(map[string]interface{})
+	username, err := body.Get("username").String()
+	if username == "" || err != nil {
+		beego.Error("Username is empty...")
+		return nil, err
+	}
+	fmt.Println("user=", username)
+	if ok := checkUser(username); !ok {
+		return nil, errors.New("Username not exist...")
+	}
+
+	password, err := body.Get("password").String()
+	if password == "" || err != nil {
+		beego.Error("Password is empty...")
+		return nil, err
+	}
+	pwdMD5 := lib.NewMD5(password)
+	result, _ := orm.Engine.Exec("update userinfo set password=? where username=?", pwdMD5, username)
+	if row, _ := result.RowsAffected(); row != 1 {
+		return nil, errors.New("update user info error...")
+	}
+	retBody["StatusCode"] = "update success..."
+	return retBody, nil
 }
 
 // checkUser true: exists, false: not exists
-func checkUser(username string) bool {
+func checkUser(name string) bool {
+	ok, _ := orm.Engine.Sql("select * from userinfo where username=?", name).Exist()
+	return ok
+}
 
-	rows, err := orm.Engine.Query("select * from userinfo where username=?", username)
-	if err == nil && rows != nil {
-		return true
-	}
-	return false
+func identifyInfo(name, pwd string) bool {
+	ok, _ := orm.Engine.Sql("select * from userinfo where username=? and password=?", name, pwd).Exist()
+	return ok
 }
