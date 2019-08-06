@@ -11,6 +11,10 @@ import (
 // Operations about Users
 type UserController struct {
 	beego.Controller
+	Guid        string
+	AccessToken string
+	Username    string
+	UserID      string
 }
 
 func (u *UserController) Post() {
@@ -24,7 +28,6 @@ func (u *UserController) Post() {
 	if err != nil {
 		beego.Error("Get cmd error: ", err.Error())
 	}
-
 	retResponse := make(map[string]interface{})
 	switch cmd {
 	case "GetUserInfo":
@@ -39,6 +42,8 @@ func (u *UserController) Post() {
 		retResponse = u.UpdateUserInfo(js)
 	case "DeleteUser":
 		retResponse = u.DeleteUser(js)
+	case "UpdateUserToken":
+		retResponse = u.UpdateUserToken(js)
 
 	default:
 		retResponse["Code"] = "cmd error"
@@ -57,10 +62,10 @@ func (u *UserController) Get() {
 	u.ServeJSON()
 }
 
-func (u *UserController) UserLogin(js *simplejson.Json) map[string]interface{} {
-	// retBody = make(map[string]interface{})
+func (u *UserController) UserLogin(js *simplejson.Json) (retBody map[string]interface{}) {
+	retBody = make(map[string]interface{})
 	retBody, err := models.UserLogin(js)
-	if err == nil {
+	if err != nil {
 		beego.Error("login failed...", err.Error())
 		return nil
 	}
@@ -102,6 +107,15 @@ func (u *UserController) DeleteUser(js *simplejson.Json) map[string]interface{} 
 	retBody, err := models.DeleteUser(js)
 	if err != nil {
 		beego.Error("delete user info error: ", err.Error())
+		return retBody
+	}
+	return retBody
+}
+
+func (u *UserController) UpdateUserToken(js *simplejson.Json) map[string]interface{} {
+	_, retBody, err := models.UpdateUserToken(js)
+	if err != nil {
+		retBody["Error"] = err.Error()
 		return retBody
 	}
 	return retBody

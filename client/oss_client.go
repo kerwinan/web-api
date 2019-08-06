@@ -12,8 +12,8 @@ import (
 // OssClient ...
 var OssClient *oss.Client
 
-// Init ...
-func Init() {
+// NewOssClient ...
+func NewOssClient() {
 	OssClient, err := oss.New(myoss.Bucket.EndPoint, myoss.Bucket.AccessKeyID, myoss.Bucket.AccesskeySecret)
 	if err != nil {
 		beego.Error("New OssClient err: ", err.Error())

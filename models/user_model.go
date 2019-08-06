@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"dana-tech.com/web-api/client"
+
 	"dana-tech.com/web-api/lib"
 
 	"dana-tech.com/orm"
@@ -23,9 +25,10 @@ var (
 
 // User ...
 type User struct {
-	Uid      string `json:"id"`
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Uid         string `json:"id"`
+	Username    string `json:"username"`
+	Password    string `json:"password"`
+	TokenStatus bool   `json:"whether out of date"`
 }
 
 func init() {
@@ -82,7 +85,15 @@ func GetUserInfo(js *simplejson.Json) (retBody map[string]interface{}, err error
 			Uid := string(row["uid"])
 			Username := string(row["username"])
 			Password := string(row["password"])
-			retBody[Uid] = &User{Uid, Username, Password}
+			token := string(row["token"])
+			var tokenStatus bool
+			err := lib.CheckToken(token)
+			if err == nil {
+				tokenStatus = true
+			} else {
+				tokenStatus = false
+			}
+			retBody[Uid] = &User{Uid, Username, Password, tokenStatus}
 		}
 		return retBody, nil
 	}
@@ -99,8 +110,15 @@ func GetAllUserInfo() (retBody map[string]interface{}) {
 			Uid := string(row["uid"])
 			Username := string(row["username"])
 			Password := string(row["password"])
-			fmt.Println("id=", Uid)
-			retBody[Uid] = &User{Uid, Username, Password}
+			token := string(row["token"])
+			var tokenStatus bool
+			err := lib.CheckToken(token)
+			if err == nil {
+				tokenStatus = true
+			} else {
+				tokenStatus = false
+			}
+			retBody[Uid] = &User{Uid, Username, Password, tokenStatus}
 		}
 	}
 	return retBody
@@ -111,20 +129,31 @@ func UserLogin(js *simplejson.Json) (retBody map[string]interface{}, err error) 
 	if !ok {
 		beego.Error("CheckGet body err: ")
 	}
+	retBody = make(map[string]interface{})
 	username, _ := body.Get("username").String()
 	password, _ := body.Get("password").String()
 	if username == "" || password == "" {
 		return nil, errors.New("name or pwd is empty")
 	}
 
-	rows, err := orm.Engine.Query("select username, password from userinfo where username=?", username)
+	rows, err := orm.Engine.Query("select username, password, token from userinfo where username=?", username)
 
+	pwdMD5 := lib.NewMD5(password)
+	var token string
 	if err == nil && rows != nil {
 		for _, row := range rows {
 			if username == string(row["username"]) &&
-				password == string(row["password"]) {
-				retBody["Status"] = "Login success"
+				pwdMD5 == string(row["password"]) {
+				token = string(row["token"])
+				if err := lib.CheckToken(token); err == nil {
+					retBody["Status"] = "Login success"
+				} else if err.Error() == "Token is expired" {
+					token, _, _ = UpdateUserToken(js)
+					retBody["Status"] = "Refresh Token, Login success"
+				}
+				client.SET(username, token)
 				retBody["Code"] = "200 OK"
+				fmt.Println(client.GET(username))
 				return retBody, nil
 			}
 		}
@@ -185,6 +214,37 @@ func UpdateUserInfo(js *simplejson.Json) (retBody map[string]interface{}, err er
 	}
 	retBody["StatusCode"] = "update success..."
 	return retBody, nil
+}
+
+func UpdateUserToken(js *simplejson.Json) (token string, retBody map[string]interface{}, err error) {
+	body, ok := js.CheckGet("body")
+	if !ok {
+		beego.Error("CheckGet body error")
+	}
+	retBody = make(map[string]interface{})
+	username, _ := body.Get("username").String()
+	password, _ := body.Get("password").String()
+	if username == "" || password == "" {
+		return "", nil, errors.New("name or pwd is empty")
+	}
+
+	rows, err := orm.Engine.Query("select username, password from userinfo where username=?", username)
+	pwdMD5 := lib.NewMD5(password)
+	if err == nil && rows != nil {
+		for _, row := range rows {
+			if username == string(row["username"]) &&
+				pwdMD5 == string(row["password"]) {
+				token = lib.GenToken()
+				_, err := orm.Engine.Query("update userinfo set token=? where username=? and password=?", token, username, pwdMD5)
+				if err != nil {
+					return token, nil, err
+				}
+				retBody["token"] = token
+			}
+		}
+	}
+	retBody["Status"] = "refresh token success"
+	return token, retBody, nil
 }
 
 // checkUser true: exists, false: not exists
