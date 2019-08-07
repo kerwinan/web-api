@@ -1,7 +1,10 @@
 package main
 
 import (
+	"time"
+
 	"dana-tech.com/orm"
+	"dana-tech.com/web-api/client"
 	"dana-tech.com/web-api/dao/redis"
 	"dana-tech.com/web-api/global"
 	"dana-tech.com/web-api/options"
@@ -16,14 +19,16 @@ func main() {
 	redis.NewRedisDao()
 	// oss.Init(cfg)
 	// client.Init()
+
 	// token := lib.GenToken()
 	// fmt.Println(token, len(token))
 	// // time.Sleep(time.Second * 3)
-	// for {
-	// 	ok := lib.CheckToken(token)
-	// 	fmt.Println(ok)
-	// 	time.Sleep(time.Second)
-	// }
+	for {
+		// ok := lib.CheckToken(token)
+		// fmt.Println(ok)
+		client.DEL("222")
+		time.Sleep(time.Second)
+	}
 
 	// combinedToken, _ := cfg.GetString("token", "token")
 	// userNode, AccessToken, StoreWay := lib.IdentifToken(combinedToken)

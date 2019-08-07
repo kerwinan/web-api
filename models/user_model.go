@@ -124,6 +124,9 @@ func GetAllUserInfo() (retBody map[string]interface{}) {
 	return retBody
 }
 
+// UserLogin 检测用户token过期方法
+// 1. 使用redis hash对象(user)，将用户名(feild)与token(value)存入，当信息存在且token未过期，则用户重复登录。
+// 2. 用户成功登录后，计算用户的token过期时间（单位：秒），将用户名（key）和过期时间（value）使用SET存入，并使用expire设置该键的生存时间（value），到期自动删除
 func UserLogin(js *simplejson.Json) (retBody map[string]interface{}, err error) {
 	body, ok := js.CheckGet("body")
 	if !ok {
@@ -135,7 +138,6 @@ func UserLogin(js *simplejson.Json) (retBody map[string]interface{}, err error) 
 	if username == "" || password == "" {
 		return nil, errors.New("name or pwd is empty")
 	}
-
 	rows, err := orm.Engine.Query("select username, password, token from userinfo where username=?", username)
 
 	pwdMD5 := lib.NewMD5(password)
@@ -146,19 +148,32 @@ func UserLogin(js *simplejson.Json) (retBody map[string]interface{}, err error) 
 				pwdMD5 == string(row["password"]) {
 				token = string(row["token"])
 				if err := lib.CheckToken(token); err == nil {
-					retBody["Status"] = "Login success"
+					if client.GET(username) != "" {
+						retBody["Status"] = "user already login..."
+					} else {
+						client.SET(username, token)
+						retBody["Status"] = "Login success"
+					}
 				} else if err.Error() == "Token is expired" {
 					token, _, _ = UpdateUserToken(js)
+					client.SET(username, token)
 					retBody["Status"] = "Refresh Token, Login success"
 				}
-				client.SET(username, token)
 				retBody["Code"] = "200 OK"
-				fmt.Println(client.GET(username))
 				return retBody, nil
 			}
 		}
 	}
 	return nil, errors.New("name or pwd error")
+}
+
+func UserLogout(username string) (retBody map[string]interface{}, err error) {
+	retBody = make(map[string]interface{})
+	if !client.DEL(username) {
+		return retBody, nil
+	}
+	beego.Info("user logout...")
+	return retBody, nil
 }
 
 // DeleteUser ...

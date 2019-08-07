@@ -26,7 +26,7 @@ func GenToken() string {
 
 	claims := &jwt.StandardClaims{
 		NotBefore: int64(time.Now().Unix()),
-		ExpiresAt: int64(time.Now().Unix() + 60),
+		ExpiresAt: int64(time.Now().Unix() + 15),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	str, err := token.SignedString([]byte("jwt test"))
@@ -37,6 +37,16 @@ func GenToken() string {
 	return str
 }
 
+// CalcTokenTime calc token's expiration time
+func CalcTokenTime(token string) int64 {
+	claims := &jwt.StandardClaims{}
+	jwt.ParseWithClaims(token, claims, func(*jwt.Token) (interface{}, error) {
+		return []byte("jwt test"), nil
+	})
+	return claims.ExpiresAt - time.Now().Unix()
+}
+
+//CheckToken token whether out of date or other error factors
 func CheckToken(token string) error {
 	_, err := jwt.Parse(token, func(*jwt.Token) (interface{}, error) {
 		return []byte("jwt test"), nil

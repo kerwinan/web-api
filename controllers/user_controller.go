@@ -44,6 +44,8 @@ func (u *UserController) Post() {
 		retResponse = u.DeleteUser(js)
 	case "UpdateUserToken":
 		retResponse = u.UpdateUserToken(js)
+	case "UserLogout":
+		retResponse = u.UserLogout(js)
 
 	default:
 		retResponse["Code"] = "cmd error"
@@ -119,4 +121,17 @@ func (u *UserController) UpdateUserToken(js *simplejson.Json) map[string]interfa
 		return retBody
 	}
 	return retBody
+}
+
+func (u *UserController) UserLogout(js *simplejson.Json) map[string]interface{} {
+	body, ok := js.CheckGet("body")
+	if !ok {
+		return nil
+	}
+	username, _ := body.Get("username").String()
+	_, err := models.UserLogout(username)
+	if err != nil {
+		return nil
+	}
+	return nil
 }
